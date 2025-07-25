@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -13,10 +14,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun TemperaturaScreen() {
+fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
+    val temperatureValue by viewModel.temperatura.observeAsState("0")
+    val temperatureFloat = temperatureValue.toFloatOrNull() ?: 0f
+
+    val backgroundColor = when {
+        temperatureFloat < 15 -> Color(0xFF87CEFA) // Azul claro
+        temperatureFloat in 15f..25f -> Color(0xFFA8F58C) // Verde
+        else -> Color(0xFFFF6B6B) // Rojo
+    }
+
     var selectedOption by remember { mutableStateOf("Fecha") }
     var inputValue by remember { mutableStateOf("") }
 
@@ -50,7 +60,7 @@ fun TemperaturaScreen() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFA8F58C))
+                        .background(backgroundColor)
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
@@ -61,7 +71,7 @@ fun TemperaturaScreen() {
                         modifier = Modifier.size(width = 50.dp, height = 100.dp)
                     )
                     Text(
-                        text = "20 °C",
+                        text = "$temperatureValue °C",
                         fontSize = 36.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 16.dp)
@@ -69,7 +79,6 @@ fun TemperaturaScreen() {
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-
                 LeyendaColores()
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -132,6 +141,7 @@ fun TemperaturaScreen() {
         }
     }
 }
+
 
 @Composable
 fun LeyendaColores() {
