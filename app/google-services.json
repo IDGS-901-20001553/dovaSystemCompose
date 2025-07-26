@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "664813096935",
+    "project_id": "dovasystemcompose",
+    "storage_bucket": "dovasystemcompose.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664813096935:android:b7e98748fe3e996c62f742",
+        "android_client_info": {
+          "package_name": "org.utl.dovasystemcompose"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZ69z-l3KuCi-gGP9SmTKvNjsMkSYiJOE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

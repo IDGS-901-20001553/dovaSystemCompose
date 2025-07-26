@@ -3,7 +3,9 @@ package org.utl.dovasystemcompose
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -15,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.utl.dovasystemcompose.model.Temperatura
+
 
 @Composable
 fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
@@ -22,13 +26,15 @@ fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
     val temperatureFloat = temperatureValue.toFloatOrNull() ?: 0f
 
     val backgroundColor = when {
-        temperatureFloat < 15 -> Color(0xFF87CEFA) // Azul claro
-        temperatureFloat in 15f..25f -> Color(0xFFA8F58C) // Verde
-        else -> Color(0xFFFF6B6B) // Rojo
+        temperatureFloat < 15 -> Color(0xFF87CEFA)
+        temperatureFloat in 15f..25f -> Color(0xFFA8F58C)
+        else -> Color(0xFFFF6B6B)
     }
 
     var selectedOption by remember { mutableStateOf("Fecha") }
     var inputValue by remember { mutableStateOf("") }
+    var resultados by remember { mutableStateOf(emptyList<Temperatura>()) }
+    var errorMsg by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -80,7 +86,6 @@ fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
 
                 Spacer(modifier = Modifier.height(24.dp))
                 LeyendaColores()
-
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Row(
@@ -90,13 +95,19 @@ fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
                     RadioButtonWithLabel(
                         selected = selectedOption == "Fecha",
                         text = "Fecha",
-                        onClick = { selectedOption = "Fecha" }
+                        onClick = {
+                            selectedOption = "Fecha"
+                            errorMsg = ""
+                        }
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     RadioButtonWithLabel(
                         selected = selectedOption == "Mes",
                         text = "Mes",
-                        onClick = { selectedOption = "Mes" }
+                        onClick = {
+                            selectedOption = "Mes"
+                            errorMsg = ""
+                        }
                     )
                 }
 
@@ -109,17 +120,44 @@ fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
                 ) {
                     OutlinedTextField(
                         value = inputValue,
-                        onValueChange = { inputValue = it },
-                        placeholder = {
-                            Text(
-                                if (selectedOption == "Fecha") "dd/mm/aaaa" else "mm"
-                            )
+                        onValueChange = {
+                            inputValue = it
+                            errorMsg = ""
                         },
+                        placeholder = {
+                            Text(if (selectedOption == "Fecha") "dd/mm/aaaa" else "mm")
+                        },
+                        isError = errorMsg.isNotEmpty(),
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { /* Acción de búsqueda */ },
+                        onClick = {
+                            val valor = inputValue.trim()
+                            val fechaRegex = Regex("^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\\d{4}$")
+                            val mesRegex = Regex("^(0[1-9]|1[0-2])$")
+
+                            if (valor.isEmpty()) {
+                                errorMsg = "Por favor ingresa un valor."
+                            } else if (selectedOption == "Fecha" && !fechaRegex.matches(valor)) {
+                                errorMsg = "Formato de fecha inválido. Usa dd/mm/aaaa."
+                            } else if (selectedOption == "Mes" && !mesRegex.matches(valor)) {
+                                errorMsg = "Formato de mes inválido. Usa mm."
+                            } else {
+                                buscarTemperaturas(
+                                    criterio = selectedOption,
+                                    valor = valor,
+                                    onSuccess = {
+                                        resultados = it
+                                        errorMsg = ""
+                                    },
+                                    onError = {
+                                        errorMsg = it
+                                        resultados = emptyList()
+                                    }
+                                )
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A40C6))
                     ) {
                         Text("Buscar", color = Color.White)
@@ -128,14 +166,26 @@ fun TemperaturaScreen(viewModel: TemperaturaViewModel = viewModel()) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Fecha y hora                   Temperatura",
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("28/05/2025 11:00              -  12°C")
-                    Text("21/05/2025 11:00              -  26°C")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 250.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (errorMsg.isNotEmpty()) {
+                        Text(text = errorMsg, color = Color.Red)
+                    } else if (resultados.isNotEmpty()) {
+                        Text(
+                            text = "Fecha y hora                   Temperatura",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        resultados.forEach { temp ->
+                            Text("${temp.fecha} ${temp.hora}        -  ${temp.valor}°C")
+                        }
+                    } else {
+                        Text("Sin resultados aún.")
+                    }
                 }
             }
         }

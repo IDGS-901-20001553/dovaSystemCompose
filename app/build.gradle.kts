@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -63,7 +64,13 @@ dependencies {
     //librerias mqtt
     implementation("com.hivemq:hivemq-mqtt-client:1.3.0")
 
-
+    // LIBRERIAS DE firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-database-ktx")
+    // firebase
+    implementation("com.google.firebase:firebase-config-ktx")
+    implementation("com.google.firebase:firebase-perf-ktx")
 
 
     implementation("androidx.activity:activity-compose:1.8.2")
