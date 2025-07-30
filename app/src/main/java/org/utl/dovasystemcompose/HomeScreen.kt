@@ -14,11 +14,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import org.utl.dovasystemcompose.viewModel.DashboardViewModel
+import androidx.compose.runtime.getValue
 
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(viewModel: DashboardViewModel = viewModel()) {
+    val estadoBomba by viewModel.estadoBomba.observeAsState("0") // Por defecto estara apagada
+
+    val historial by viewModel.historial.observeAsState(emptyList())
+    GraficaAguaVico(niveles = historial)
+
+    //llenado dinamico cisterna
+    val nivelActualMl by viewModel.nivelAgua.observeAsState(0)
+    val porcentajeLlenado = (nivelActualMl / 2500.0 * 100).toInt().coerceIn(0, 100)
+
+    val textoBomba = if (estadoBomba == "1") "Encendida" else "Apagada"
+    val colorBomba = if (estadoBomba == "1") Color(0xFF4CAF50) else Color.Red
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -62,22 +77,19 @@ fun HomeScreen() {
                     color = Color.Black
                 )
 
-                // Imagen estado de la cisterna
-                Image(
-                    painter = painterResource(id = R.drawable.house),
-                    contentDescription = "Estado cisterna",
+                // grafica en tiempo real
+                GraficaAguaVico(niveles = historial)
+
+
+                // ESTADO ACTUAL DE LA CISTERNA
+                Text(
+                    text = "Estado actual de la cisterna",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                )
-
-                Text(
-                    text = "Estado actual de la cisterna ",
-                    modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 25.dp),
                     color = Color.Black,
                     style = MaterialTheme.typography.titleMedium,
-                    )
+                )
 
                 Row(
                     modifier = Modifier
@@ -92,7 +104,7 @@ fun HomeScreen() {
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "90%",
+                        text = "$porcentajeLlenado%",
                         style = MaterialTheme.typography.headlineSmall
                     )
                 }
@@ -101,7 +113,7 @@ fun HomeScreen() {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFEDEDED)) // Gris claro
+                        .background(Color(0xFFEDEDED))
                         .padding(vertical = 12.dp)
                 ) {
                     Row(
@@ -109,18 +121,23 @@ fun HomeScreen() {
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = 25.dp)
                     ) {
-                        CardAlerta(
-                            iconId = R.drawable.alerta,
-                            title = "Alerta de Llenado",
-                            status = "90%",
-                            color = Color(0xFF3F51B5)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        // Mostrar la alerta de llenado solo si el porcentaje ≥ 80%
+                        if (porcentajeLlenado >= 80) {
+                            CardAlerta(
+                                iconId = R.drawable.alerta,
+                                title = "Alerta de Llenado",
+                                status = "$porcentajeLlenado%",
+                                color = Color(0xFF3F51B5)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+
+                        // Siempre mostrar el estado de la bomba
                         CardAlerta(
                             iconId = R.drawable.estado,
                             title = "Bomba de Agua",
-                            status = "Apagado",
-                            color = Color.Red
+                            status = textoBomba,
+                            color = colorBomba
                         )
                     }
                 }

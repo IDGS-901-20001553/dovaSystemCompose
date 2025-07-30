@@ -71,6 +71,15 @@ dependencies {
     // firebase
     implementation("com.google.firebase:firebase-config-ktx")
     implementation("com.google.firebase:firebase-perf-ktx")
+    //graficacion
+    implementation("com.patrykandpatrick.vico:compose:1.13.0")
+    implementation("com.patrykandpatrick.vico:core:1.13.0")
+
+    implementation("com.patrykandpatrick.vico:compose-m3:1.13.0")
+    implementation("com.patrykandpatrick.vico:views:1.13.0")
+
+
+
 
 
     implementation("androidx.activity:activity-compose:1.8.2")

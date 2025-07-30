@@ -5,7 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ModuloBombaScreen() {
+    var isAutoMode by remember { mutableStateOf(true) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -40,7 +42,7 @@ fun ModuloBombaScreen() {
                     modifier = Modifier.size(200.dp)
                 )
 
-                // Botones ON y OFF al estilo XML
+                // Botones ON y OFF
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -68,6 +70,24 @@ fun ModuloBombaScreen() {
                     }
                 }
 
+                // Botón AUTO / MANUAL centrado abajo
+                Button(
+                    onClick = { isAutoMode = !isAutoMode },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp)
+                        .heightIn(min = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1))
+                ) {
+                    Text(
+                        text = if (isAutoMode) "AUTO" else "MANUAL",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Historial
                 Text(
                     text = "Historial de Encendidos",
                     modifier = Modifier.padding(top = 24.dp),
