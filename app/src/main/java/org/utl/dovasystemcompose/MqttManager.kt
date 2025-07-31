@@ -4,6 +4,9 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.google.firebase.Firebase
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.database
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
@@ -21,6 +24,7 @@ class MqttManager {
 
     private val database = Firebase.database("https://dovasystemcompose-default-rtdb.firebaseio.com")
     private val tempRef = database.getReference("temperatura")
+    private val usersRef = database.getReference("users")
 
     private val mqttClient = MqttClient.builder()
         .useMqttVersion5()
@@ -48,6 +52,20 @@ class MqttManager {
 
                 }
             }
+    }
+    fun getUserName(uid: String, onComplete: (String?) -> Unit) {
+        usersRef.child(uid).child("nombre").addListenerForSingleValueEvent(object :
+            ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val userName = snapshot.getValue(String::class.java)
+                onComplete(userName)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("FirebaseDB", "Error al leer el nombre del usuario: ${error.message}")
+                onComplete(null)
+            }
+        })
     }
 
     private fun subscribeToTemperature() {

@@ -1,6 +1,7 @@
 package org.utl.dovasystemcompose
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,12 +20,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth // Import Firebase Auth
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen() {
     val context = LocalContext.current
+    val auth = remember { FirebaseAuth.getInstance() } // Get Firebase Auth instance
 
-    var usuario by remember { mutableStateOf("") }
+    var usuario by remember { mutableStateOf("") } // This will be the email for Firebase Auth
     var contrasena by remember { mutableStateOf("") }
 
     Box(
@@ -72,11 +76,11 @@ fun LoginScreen() {
                         modifier = Modifier.padding(top = 12.dp, bottom = 20.dp)
                     )
 
-                    // Campo Usuario
+                    // Campo Usuario (Email)
                     OutlinedTextField(
                         value = usuario,
                         onValueChange = { usuario = it },
-                        placeholder = { Text("Usuario") },
+                        placeholder = { Text("Correo electrónico") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(70.dp)
@@ -87,7 +91,8 @@ fun LoginScreen() {
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent,
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
 
                     // Campo Contraseña
@@ -113,7 +118,22 @@ fun LoginScreen() {
                     // Botón Login
                     Button(
                         onClick = {
-                            context.startActivity(Intent(context, Dashboard::class.java))
+                            if (usuario.isNotBlank() && contrasena.isNotBlank()) {
+                                auth.signInWithEmailAndPassword(usuario, contrasena)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            // Sign in success, update UI with the signed-in user's information
+                                            Toast.makeText(context, "Inicio de sesión exitoso.", Toast.LENGTH_SHORT).show()
+                                            // *** CORRECTED LINE HERE ***
+                                            context.startActivity(Intent(context, Dashboard::class.java)) // Redirect to your Dashboard
+                                        } else {
+                                            // If sign in fails, display a message to the user.
+                                            Toast.makeText(context, "Error en el inicio de sesión: usuario o contraseña incorrectos.", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                            } else {
+                                Toast.makeText(context, "Por favor, complete todos los campos.", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -130,9 +150,22 @@ fun LoginScreen() {
                             fontWeight = FontWeight.Bold
                         )
                     }
+
+                    // Link to Registration (Optional but highly recommended)
+                    TextButton(
+                        onClick = {
+                            context.startActivity(Intent(context, Registro::class.java))
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text(
+                            text = "¿No tienes una cuenta? Regístrate aquí",
+                            color = Color(0xFF4942CE),
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
     }
 }
-
