@@ -2,7 +2,11 @@ package org.utl.dovasystemcompose
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Environment
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,47 +15,54 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.utl.dovasystemcompose.viewModel.CaptacionViewModel
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import org.utl.dovasystemcompose.model.Captacion
+import org.utl.dovasystemcompose.viewModel.CaptacionViewModel
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.net.Uri
-import androidx.core.content.FileProvider
-import android.util.Log
-import android.content.ContentValues // ¡NUEVA IMPORTACIÓN!
-import android.os.Build
-import android.provider.MediaStore // ¡NUEVA IMPORTACIÓN!
-import android.os.Environment // ¡NUEVA IMPORTACIÓN!
-import androidx.annotation.RequiresApi
 
-
-private const val TAG = "CSV_EXPORT"
-
-@RequiresApi(Build.VERSION_CODES.Q)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistorialCaptacionScreen(viewModel: CaptacionViewModel = viewModel()) {
-    val context = LocalContext.current
-
     var selectedOption by remember { mutableStateOf("Fecha") }
     var inputValue by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
-    val captacionesList by viewModel.captaciones.observeAsState(emptyList())
-    val totalAguaCaptada by viewModel.totalAguaCaptada.observeAsState(0)
+    val captaciones by viewModel.captaciones.observeAsState(emptyList())
+    val totalAguaCaptadaMl by viewModel.totalAguaCaptada.observeAsState(0)
+
+    val totalAguaCaptadaL = totalAguaCaptadaMl.toFloat() / 1000f
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val outputStream: OutputStream? = context.contentResolver.openOutputStream(it)
+                outputStream?.use { stream ->
+                    val csvText = buildCsvContent(captaciones)
+                    stream.write(csvText.toByteArray())
+                    Toast.makeText(context, "Archivo CSV guardado.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al guardar el archivo: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -61,8 +72,7 @@ fun HistorialCaptacionScreen(viewModel: CaptacionViewModel = viewModel()) {
         HeaderSection(imageRes = R.drawable.captacion, title = "Historial de Captación")
 
         Surface(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
             color = Color.White
         ) {
@@ -70,63 +80,50 @@ fun HistorialCaptacionScreen(viewModel: CaptacionViewModel = viewModel()) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Filtrar por:", modifier = Modifier.padding(end = 8.dp))
                     DropdownMenuBox(
                         options = listOf("Fecha", "Mes"),
                         selectedOption = selectedOption,
-                        onOptionSelected = { selectedOption = it }
+                        onOptionSelected = {
+                            selectedOption = it
+                            inputValue = ""
+                        }
+                    )
+                    OutlinedTextField(
+                        value = inputValue,
+                        onValueChange = { inputValue = it },
+                        label = { Text("Valor") },
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = inputValue,
-                    onValueChange = { inputValue = it },
-                    label = { Text(if (selectedOption == "Fecha") "Fecha (DD/MM/AAAA)" else "Mes (MM)") },
-                    placeholder = { Text(if (selectedOption == "Fecha") "Ej: 15/07/2025" else "Ej: 07") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Button(
+                    onClick = {
+                        if (inputValue.isNotEmpty()) {
+                            viewModel.cargarCaptaciones(selectedOption, inputValue)
+                        } else {
+                            Toast.makeText(context, "Por favor, ingresa un valor.", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A40C6))
                 ) {
-                    Button(
-                        onClick = {
-                            if (inputValue.isNotBlank()) {
-                                viewModel.cargarCaptaciones(selectedOption, inputValue)
-                            } else {
-                                Toast.makeText(context, "Por favor, ingresa un valor para filtrar.", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A40C6))
-                    ) {
-                        Text("Generar Corte", color = Color.White)
-                    }
+                    Text("Filtrar", color = Color.White)
+                }
 
-                    Button(
-                        onClick = {
-                            if (captacionesList.isNotEmpty()) {
-                                exportCaptacionesToCsv(context, captacionesList, selectedOption, inputValue)
-                            } else {
-                                Toast.makeText(context, "No hay datos para exportar.", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray)
-                    ) {
-                        Text("Exportar CSV", color = Color.Black)
-                    }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                        exportLauncher.launch("dovasystem_captacion_$timestamp.csv")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00796B))
+                ) {
+                    Text("Generar CSV", color = Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -140,38 +137,21 @@ fun HistorialCaptacionScreen(viewModel: CaptacionViewModel = viewModel()) {
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = if (selectedOption == "Fecha") "Total del día: $inputValue" else "Total del mes: $inputValue",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Total captado", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "$totalAguaCaptada L",
+                            text = String.format("%.2f L", totalAguaCaptadaL),
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF4A40C6)
                         )
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Registros Detallados:",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                if (captacionesList.isEmpty()) {
-                    Text("No hay registros para el criterio seleccionado.", color = Color.Gray)
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(captacionesList) { captacion ->
-                            CaptacionItem(captacion = captacion)
-                        }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(captaciones) { registro ->
+                        CaptacionItem(registro)
                     }
                 }
             }
@@ -179,98 +159,52 @@ fun HistorialCaptacionScreen(viewModel: CaptacionViewModel = viewModel()) {
     }
 }
 
-// =======================================================================
-// === FUNCIÓN PARA EXPORTAR A CSV (MODIFICADA PARA GUARDAR DIRECTO) ===
-// =======================================================================
-@RequiresApi(Build.VERSION_CODES.Q)
-private fun exportCaptacionesToCsv(
-    context: Context,
-    captaciones: List<Captacion>,
-    criterio: String,
-    valor: String
-) {
-    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val fileName = "captaciones_${criterio}_${valor.replace("/", "-")}_$timestamp.csv"
-    val csvHeader = "Fecha,Hora,AguaCaptada (L)\n"
-
-    Log.d(TAG, "Intentando guardar CSV en Descargas: $fileName")
-
-    try {
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName) // Nombre del archivo visible para el usuario
-            put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")   // Tipo MIME del archivo
-            // Directorio donde se guardará (Descargas)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-        }
-
-        val resolver = context.contentResolver
-        // Inserta un nuevo elemento en la colección de Descargas y obtén su URI
-        val uri: Uri? = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-
-        uri?.let { fileUri ->
-            // Abre un OutputStream para escribir datos en la URI obtenida
-            resolver.openOutputStream(fileUri)?.use { outputStream ->
-                outputStream.write(csvHeader.toByteArray())
-                captaciones.forEach { captacion ->
-                    val line = "${captacion.fecha},${captacion.hora},${captacion.aguaCaptada}\n"
-                    outputStream.write(line.toByteArray())
-                }
-                Log.d(TAG, "CSV guardado exitosamente en: $fileUri")
-                Toast.makeText(context, "CSV guardado en la carpeta Descargas: $fileName", Toast.LENGTH_LONG).show()
-            } ?: run {
-                Log.e(TAG, "No se pudo abrir el stream para escribir el archivo.")
-                Toast.makeText(context, "Error: No se pudo abrir el stream para guardar el archivo.", Toast.LENGTH_SHORT).show()
-            }
-        } ?: run {
-            Log.e(TAG, "No se pudo crear la URI para el archivo en Descargas.")
-            Toast.makeText(context, "Error: No se pudo crear el archivo en Descargas.", Toast.LENGTH_SHORT).show()
-        }
-    } catch (e: Exception) {
-        Log.e(TAG, "Error general al guardar CSV: ${e.message}", e)
-        Toast.makeText(context, "Error al guardar CSV: ${e.message}", Toast.LENGTH_LONG).show()
-    }
-}
-
-
-// Composable para cada item de la lista de captaciones (sin cambios)
 @Composable
 fun CaptacionItem(captacion: Captacion) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(8.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val aguaCaptadaL = captacion.aguaCaptada.toFloat() / 1000f
+
             Icon(
                 painter = painterResource(id = R.drawable.gota),
-                contentDescription = "Agua",
-                tint = Color(0xFF4A40C6),
+                contentDescription = "Gota de agua",
+                tint = Color(0xFF0288D1),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Fecha: ${captacion.fecha}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text(text = "Hora: ${captacion.hora}", fontSize = 14.sp, color = Color.Gray)
-            }
             Text(
-                text = "${captacion.aguaCaptada} L",
-                fontSize = 18.sp,
+                text = "${captacion.fecha} ${captacion.hora}",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = String.format("%.2f L", aguaCaptadaL),
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF4A40C6)
+                color = Color(0xFF0288D1)
             )
         }
     }
 }
 
+private fun buildCsvContent(data: List<Captacion>): String {
+    val csvContent = StringBuilder()
+    csvContent.append("Fecha,Hora,Agua Captada (L)\n")
+    data.forEach {
+        val aguaEnLitros = String.format("%.2f", it.aguaCaptada.toFloat() / 1000f)
+        csvContent.append("${it.fecha},${it.hora},${aguaEnLitros}\n")
+    }
+    return csvContent.toString()
+}
 
-// DropdownMenuBox (sin cambios)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownMenuBox(
@@ -283,7 +217,8 @@ fun DropdownMenuBox(
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
-        modifier = Modifier.width(IntrinsicSize.Min)
+        // Se ha ajustado el ancho para hacerlo más pequeño
+        modifier = Modifier.width(130.dp)
     ) {
         OutlinedTextField(
             value = selectedOption,
