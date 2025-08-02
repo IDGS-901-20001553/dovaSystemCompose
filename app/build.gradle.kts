@@ -78,7 +78,7 @@ dependencies {
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.0")
     implementation("com.patrykandpatrick.vico:views:1.13.0")
 
-    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-auth-ktx")
 
 
 

@@ -51,6 +51,7 @@ class MqttManager {
                     subscribeToTemperature()
                     subscribeToEstadoBomba()
                     subscribeToSensorUltrasonico()
+
                 }
             }
     }
@@ -135,8 +136,26 @@ class MqttManager {
 
                 Log.d("MQTT", "Estado de bomba recibido: $estado")
                 _estadoBomba.postValue(estado)
+
+                // Guardar en Firebase el estado como texto legible
+                guardarHistorialBomba(estado)
             }
             .send()
+    }
+
+    //guardar estado en firebase
+    private fun guardarHistorialBomba(estado: String) {
+        val fechaHora = Calendar.getInstance().time
+        val formatoFecha = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val formatoHora = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+        val entrada = HistorialBomba(
+            fecha = formatoFecha.format(fechaHora),
+            hora = formatoHora.format(fechaHora),
+            estado = if (estado == "1") "Encendida" else "Apagada"
+        )
+
+        historialBombaRef.push().setValue(entrada)
     }
 
 
@@ -227,50 +246,31 @@ class MqttManager {
     }
 
     fun publishBombaMode(mode: String) {
-        val topic = "modo-bomba"
+        val topic = "control-bomba"
         Log.d("MQTT", "Publicando modo de bomba: $mode en $topic")
         mqttClient.publishWith().topic(topic).qos(MqttQos.AT_LEAST_ONCE).payload(mode.toByteArray()).send()
     }
 
-    // Nueva función para suscribirse al estado de la bomba
-    fun subscribeToBombaEstado(onMessageReceived: (String) -> Unit) {
-        val topic = "estado-bomba"
-        mqttClient.subscribeWith()
-            .topicFilter(topic)
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .callback { publish ->
-                val estado = String(publish.payloadAsBytes)
-                Log.d("MQTT", "Mensaje de estado de bomba recibido: $estado")
-                onMessageReceived(estado)
-            }
-            .send()
-    }
 
-    // Nueva función para suscribirse al modo de control de la bomba
-    fun subscribeToBombaModo(onMessageReceived: (String) -> Unit) {
-        val topic = "modo-bomba"
-        mqttClient.subscribeWith()
-            .topicFilter(topic)
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .callback { publish ->
-                val modo = String(publish.payloadAsBytes)
-                Log.d("MQTT", "Mensaje de modo de bomba recibido: $modo")
-                onMessageReceived(modo)
-            }
-            .send()
-    }
+
+
 
     // Nueva función para leer el historial de la bomba desde Firebase
-    fun leerHistorialBombaDesdeFirebase(
-        onSuccess: (List<HistorialBomba>) -> Unit,
+
+    fun observarHistorialBombaTiempoReal(
+        onDataChange: (List<HistorialBomba>) -> Unit,
         onError: (String) -> Unit
     ) {
-        historialBombaRef.get().addOnSuccessListener { snapshot ->
-            val lista = snapshot.children.mapNotNull { it.getValue(HistorialBomba::class.java) }
-            onSuccess(lista)
-        }.addOnFailureListener {
-            onError("Error al leer historial de bomba: ${it.message}")
-        }
+        historialBombaRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val lista = snapshot.children.mapNotNull { it.getValue(HistorialBomba::class.java) }
+                onDataChange(lista.sortedByDescending { it.fecha + it.hora })
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                onError("Error al escuchar historial en tiempo real: ${error.message}")
+            }
+        })
     }
 
     fun disconnect() {

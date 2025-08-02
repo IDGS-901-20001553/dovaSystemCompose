@@ -126,10 +126,14 @@ fun ModuloBombaScreen(viewModel: ModuloBombaViewModel = viewModel()) {
                     fontWeight = FontWeight.Bold
                 )
 
-                // Lista de historial (usando LazyColumn para eficiencia)
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(historial) { registro ->
-                        HistorialBombaItem(registro)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 250.dp) // Establece una altura máxima para el scroll
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(historial) { item ->
+                        HistorialBombaItem(registro = item)
                     }
                 }
             }
@@ -138,6 +142,7 @@ fun ModuloBombaScreen(viewModel: ModuloBombaViewModel = viewModel()) {
 }
 
 // Composable para cada item del historial (sin cambios)
+
 @Composable
 fun HistorialBombaItem(registro: HistorialBomba) {
     Card(

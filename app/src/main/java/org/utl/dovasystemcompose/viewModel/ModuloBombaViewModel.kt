@@ -1,5 +1,6 @@
 package org.utl.dovasystemcompose.viewModel
 
+
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -11,26 +12,26 @@ import kotlinx.coroutines.launch
 class ModuloBombaViewModel : ViewModel() {
     private val mqttManager = MqttManager()
 
-    private val _estadoBomba = MutableLiveData<String>("Apagada") // 'Encendida' o 'Apagada'
+    private val _estadoBomba = MutableLiveData("Apagada")
     val estadoBomba: LiveData<String> = _estadoBomba
 
-    private val _modoControl = MutableLiveData<String>("AUTOMÁTICO") // 'AUTOMÁTICO' o 'MANUAL'
+    private val _modoControl = MutableLiveData("AUTOMÁTICO")
     val modoControl: LiveData<String> = _modoControl
 
     private val _historialBomba = MutableLiveData<List<HistorialBomba>>(emptyList())
     val historialBomba: LiveData<List<HistorialBomba>> = _historialBomba
 
     init {
-        // Conectar al broker MQTT al inicializar el ViewModel
+        // Conectar y suscribirse solo a estado-bomba
         mqttManager.connect()
-        // Suscribirse a los tópicos relevantes
-        mqttManager.subscribeToBombaEstado { estado ->
-            _estadoBomba.postValue(estado)
+        // Suscripción al estado de la bomba
+        mqttManager.estadoBomba.observeForever { estado ->
+            // Traducir estado '1' o '0' a texto visible
+            val textoEstado = if (estado == "1") "Encendida" else "Apagada"
+            _estadoBomba.postValue(textoEstado)
         }
-        mqttManager.subscribeToBombaModo { modo ->
-            _modoControl.postValue(modo)
-        }
-        // Cargar el historial desde Firebase al iniciar
+
+        // Cargar historial
         cargarHistorialBomba()
     }
 
@@ -43,18 +44,20 @@ class ModuloBombaViewModel : ViewModel() {
     }
 
     fun cambiarModoControl() {
-        // Alternar entre AUTOMÁTICO y MANUAL y enviar el comando MQTT
         val nuevoModo = if (_modoControl.value == "AUTOMÁTICO") "MANUAL" else "AUTOMÁTICO"
-        mqttManager.publishBombaMode(if (nuevoModo == "AUTOMÁTICO") "1" else "0")
+        _modoControl.value = nuevoModo
+        mqttManager.publishBombaCommand(if (nuevoModo == "AUTOMÁTICO") "auto" else "manual")
     }
 
     fun cargarHistorialBomba() {
         viewModelScope.launch {
-            mqttManager.leerHistorialBombaDesdeFirebase(
-                onSuccess = { historial ->
-                    _historialBomba.postValue(historial.sortedByDescending { it.fecha + it.hora })
+            mqttManager.observarHistorialBombaTiempoReal(
+                onDataChange = { historial ->
+                    _historialBomba.postValue(historial)
                 },
-                onError = { /* manejar error */ }
+                onError = {
+                    // Opcional manejo de error
+                }
             )
         }
     }
