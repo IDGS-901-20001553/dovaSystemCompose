@@ -1,6 +1,7 @@
 package org.utl.dovasystemcompose
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,14 +20,18 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase // Importar FirebaseDatabase
+import com.google.firebase.database.database // Importar la extensión 'database'
+import com.google.firebase.Firebase // Importar Firebase principal
 
-
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegistroScreen() {
     val context = LocalContext.current
+    val auth = remember { FirebaseAuth.getInstance() }
+    val database = remember { Firebase.database } // Obtener la instancia de Realtime Database
 
-    // Estados para los campos
     var nombre by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
@@ -84,7 +89,8 @@ fun RegistroScreen() {
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White
                     )
                 )
 
@@ -99,7 +105,8 @@ fun RegistroScreen() {
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White
                     )
                 )
 
@@ -115,7 +122,8 @@ fun RegistroScreen() {
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White
                     )
                 )
 
@@ -124,8 +132,39 @@ fun RegistroScreen() {
                 // Botón Registrarse
                 Button(
                     onClick = {
-                        val intent = Intent(context, Login::class.java)
-                        context.startActivity(intent)
+                        if (correo.isNotBlank() && contrasena.isNotBlank() && nombre.isNotBlank()) {
+                            auth.createUserWithEmailAndPassword(correo, contrasena)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        // Registro de autenticación exitoso
+                                        val userId = auth.currentUser?.uid
+                                        if (userId != null) {
+                                            // Guardar el nombre en Realtime Database usando el UID
+                                            val usersRef = database.getReference("users") // Referencia a una colección 'users'
+                                            usersRef.child(userId).child("nombre").setValue(nombre)
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(context, "Registro exitoso y nombre guardado.", Toast.LENGTH_SHORT).show()
+                                                    val intent = Intent(context, Login::class.java)
+                                                    context.startActivity(intent)
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(context, "Registro exitoso, pero error al guardar nombre: ${e.message}", Toast.LENGTH_LONG).show()
+                                                    val intent = Intent(context, Login::class.java)
+                                                    context.startActivity(intent)
+                                                }
+                                        } else {
+                                            Toast.makeText(context, "Registro exitoso, pero UID de usuario no encontrado.", Toast.LENGTH_SHORT).show()
+                                            val intent = Intent(context, Login::class.java)
+                                            context.startActivity(intent)
+                                        }
+                                    } else {
+                                        // Si falla el registro de autenticación
+                                        Toast.makeText(context, "Error en el registro: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                        } else {
+                            Toast.makeText(context, "Por favor, complete todos los campos.", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -142,4 +181,3 @@ fun RegistroScreen() {
         }
     }
 }
-
