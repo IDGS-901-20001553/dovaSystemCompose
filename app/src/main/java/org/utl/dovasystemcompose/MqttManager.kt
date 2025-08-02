@@ -11,6 +11,7 @@ import com.google.firebase.database.database
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import org.utl.dovasystemcompose.model.Captacion
+import org.utl.dovasystemcompose.model.HistorialBomba
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -25,6 +26,7 @@ class MqttManager {
     private val database = Firebase.database("https://dovasystemcompose-default-rtdb.firebaseio.com")
     private val tempRef = database.getReference("temperatura")
     private val usersRef = database.getReference("users")
+    private val historialBombaRef = database.getReference("historialBomba")
 
     private val mqttClient = MqttClient.builder()
         .useMqttVersion5()
@@ -49,7 +51,6 @@ class MqttManager {
                     subscribeToTemperature()
                     subscribeToEstadoBomba()
                     subscribeToSensorUltrasonico()
-
                 }
             }
     }
@@ -219,6 +220,59 @@ class MqttManager {
         }
     }
 
+    fun publishBombaCommand(command: String) {
+        val topic = "control-bomba"
+        Log.d("MQTT", "Publicando comando de bomba: $command en $topic")
+        mqttClient.publishWith().topic(topic).qos(MqttQos.AT_LEAST_ONCE).payload(command.toByteArray()).send()
+    }
+
+    fun publishBombaMode(mode: String) {
+        val topic = "modo-bomba"
+        Log.d("MQTT", "Publicando modo de bomba: $mode en $topic")
+        mqttClient.publishWith().topic(topic).qos(MqttQos.AT_LEAST_ONCE).payload(mode.toByteArray()).send()
+    }
+
+    // Nueva función para suscribirse al estado de la bomba
+    fun subscribeToBombaEstado(onMessageReceived: (String) -> Unit) {
+        val topic = "estado-bomba"
+        mqttClient.subscribeWith()
+            .topicFilter(topic)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .callback { publish ->
+                val estado = String(publish.payloadAsBytes)
+                Log.d("MQTT", "Mensaje de estado de bomba recibido: $estado")
+                onMessageReceived(estado)
+            }
+            .send()
+    }
+
+    // Nueva función para suscribirse al modo de control de la bomba
+    fun subscribeToBombaModo(onMessageReceived: (String) -> Unit) {
+        val topic = "modo-bomba"
+        mqttClient.subscribeWith()
+            .topicFilter(topic)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .callback { publish ->
+                val modo = String(publish.payloadAsBytes)
+                Log.d("MQTT", "Mensaje de modo de bomba recibido: $modo")
+                onMessageReceived(modo)
+            }
+            .send()
+    }
+
+    // Nueva función para leer el historial de la bomba desde Firebase
+    fun leerHistorialBombaDesdeFirebase(
+        onSuccess: (List<HistorialBomba>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        historialBombaRef.get().addOnSuccessListener { snapshot ->
+            val lista = snapshot.children.mapNotNull { it.getValue(HistorialBomba::class.java) }
+            onSuccess(lista)
+        }.addOnFailureListener {
+            onError("Error al leer historial de bomba: ${it.message}")
+        }
+    }
+
     fun disconnect() {
         mqttClient.disconnect()
             .whenComplete { _, throwable ->
@@ -230,4 +284,3 @@ class MqttManager {
             }
     }
 }
-
